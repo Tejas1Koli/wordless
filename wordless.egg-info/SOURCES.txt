@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+wordless/__init__.py
+wordless/config.py
+wordless/config_manager.py
+wordless/gateway_client.py
+wordless/main.py
+wordless/mcp_server.py
+wordless/search.py
+wordless.egg-info/PKG-INFO
+wordless.egg-info/SOURCES.txt
+wordless.egg-info/dependency_links.txt
+wordless.egg-info/entry_points.txt
+wordless.egg-info/requires.txt
+wordless.egg-info/top_level.txt

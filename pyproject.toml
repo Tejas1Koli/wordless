@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wordless"
+version = "0.1.0"
+description = "Semantic code search engine for Python codebases"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "tree-sitter>=0.20",
+    "tree-sitter-python>=0.20",
+    "chromadb>=1.5",
+    "ollama>=0.1",
+    "prompt-toolkit>=3.0",
+    "typer>=0.10",
+    "fastmcp>=0.5",
+]
+
+[tool.setuptools]
+packages = ["wordless"]
+
+[tool.setuptools.package-data]
+wordless = ["py.typed"]
+
+[project.scripts]
+wordless = "wordless.cli.app:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/wordless"

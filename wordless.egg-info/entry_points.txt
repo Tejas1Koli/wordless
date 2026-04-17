@@ -1,0 +1,2 @@
+[console_scripts]
+wordless = wordless.cli.app:main
