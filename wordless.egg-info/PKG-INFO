@@ -8,6 +8,7 @@ Description-Content-Type: text/markdown
 Requires-Dist: tree-sitter>=0.20
 Requires-Dist: tree-sitter-python>=0.20
 Requires-Dist: chromadb>=1.5
+Requires-Dist: httpx>=0.24
 Requires-Dist: ollama>=0.1
 Requires-Dist: prompt-toolkit>=3.0
 Requires-Dist: typer>=0.10

@@ -1,5 +1,6 @@
 import httpx
 from dataclasses import dataclass
+from wordless import config
 
 
 @dataclass
@@ -25,9 +26,11 @@ class Chunk:
 
 
 class GatewayClient:
-    def __init__(self, api_key: str, gateway_url: str = "https://api.wordless.dev"):
+    def __init__(self, api_key: str, gateway_url: str = None):
+        """Create a Gateway client using provided `gateway_url` or the central config."""
         self.api_key = api_key
-        self.gateway_url = gateway_url.rstrip("/")
+        gw = gateway_url or config.GATEWAY_URL or "https://api.wordless.dev"
+        self.gateway_url = gw.rstrip("/")
         self.headers = {"x-api-key": api_key}
 
     def embed(self, chunks: list[Chunk], batch_size: int = 100) -> list[list[float]]:

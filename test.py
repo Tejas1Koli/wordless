@@ -4,7 +4,7 @@ from pathlib import Path
 from fastmcp import Client
 
 REPO = "/Users/tejaskoli/ollama-learn"
-SERVER = "http://localhost:8000/mcp"
+SERVER = "http://localhost:6767/mcp"
 
 # ─── 1. parser ───────────────────────────────────────────────
 def test_parser():

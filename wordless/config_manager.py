@@ -10,10 +10,12 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 # Default configuration
 DEFAULTS = {
     "api_key": "",                                      # User's auth token for our gateway
-    "gateway_url": "http://localhost:8000",            # Our hosted gateway (or local for dev)
-    "repo_path": "/Users/tejaskoli/ollama-learn",
+    "gateway_url": "http://localhost:6768",            # Our hosted gateway (or local for dev)
     "top_k": 5,                                         # Search results
     "default_hops": 3,                                  # Call graph expansion
+    "mcp_host": "localhost",                           # MCP server host
+    "mcp_port": 6767,                                  # MCP server port
+    "indexed_repos": [],                               # [{"name": "repo", "path": "/abs/path"}]
 }
 
 

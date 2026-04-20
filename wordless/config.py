@@ -8,7 +8,7 @@ HISTORY_FILE = Path.home() / ".wordless_history"
 
 # Cloud gateway configuration
 API_KEY = get("api_key")
-GATEWAY_URL = get("gateway_url", "http://localhost:8000")
+GATEWAY_URL = get("gateway_url", "http://localhost:6768")
 
 # Repository
 REPO_PATH = get("repo_path")
@@ -17,5 +17,9 @@ REPO_PATH = get("repo_path")
 TOP_K = get("top_k")
 DEFAULT_HOPS = get("default_hops")
 
-# Local storage (for vector DB)
-DB_PATH = ".code_memory"
+# MCP server
+MCP_HOST = get("mcp_host", "localhost")
+MCP_PORT = get("mcp_port", 6767)
+
+# Local storage (for vector DB) - use absolute path
+DB_PATH = str(Path.home() / ".wordless" / "code_memory")

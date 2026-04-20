@@ -1,12 +1,13 @@
 from wordless.indexer.parser import index_repo
 from wordless.indexer.embedder import embed
 from wordless.indexer.store import upsert
+from wordless import config
 
-repo_path = "/Users/tejaskoli/ollama-learn"
+repo_path = config.REPO_PATH
 print("Parsing...")
 chunks = index_repo(repo_path)
 print(f"Found {len(chunks)} chunks, embedding...")
 embeddings = embed([c.source for c in chunks])
 print("Storing...")
-upsert(chunks, embeddings)
+upsert(chunks, embeddings, repo_path=repo_path)
 print("Done.")

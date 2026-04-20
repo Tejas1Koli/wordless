@@ -8,8 +8,9 @@ CallGraph = dict[str, set[str]]
 def build_callgraph(repo_path: str) -> CallGraph:
     graph: CallGraph = defaultdict(set)
     SKIP = {"__pycache__", "site-packages", "dist-packages", ".git", "node_modules"}
+    repo = Path(repo_path)
 
-    for path in Path(repo_path).rglob("*.py"):
+    for path in repo.rglob("*.py"):
         if any(p in SKIP for p in path.parts):
             continue
         # skip venv
@@ -21,14 +22,21 @@ def build_callgraph(repo_path: str) -> CallGraph:
         except Exception:
             continue
 
+        # Relative file path for cleaner keys
+        rel_file = str(path.relative_to(repo))
+        
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                caller = node.name
+                caller = f"{rel_file}::{node.name}"
                 for child in ast.walk(node):
                     if isinstance(child, ast.Call):
                         if isinstance(child.func, ast.Name):
-                            graph[caller].add(child.func.id)
+                            # Simple call: assume same file (or builtin)
+                            callee_name = child.func.id
+                            # Try to find it in same file, else store as-is
+                            graph[caller].add(f"{rel_file}::{callee_name}")
                         elif isinstance(child.func, ast.Attribute):
+                            # Attribute call: store as-is (hard to resolve without import analysis)
                             graph[caller].add(child.func.attr)
     return dict(graph)
 

@@ -53,7 +53,7 @@ class IndexManager:
         embeddings = embed([c.source for c in chunks])
         
         print("  5️⃣ Storing in vector DB...")
-        upsert(chunks, embeddings)
+        upsert(chunks, embeddings, repo_path=str(repo_path))
         
         self.current_repo = str(repo_path)
         self.callgraph = callgraph
@@ -76,7 +76,7 @@ class IndexManager:
         if hops is None:
             hops = config.DEFAULT_HOPS
 
-        return search_code(query, self.callgraph, hops=hops)
+        return search_code(query, self.callgraph, hops=hops, repo_path=self.current_repo)
 
     def status(self) -> str:
         """Return current indexing status."""

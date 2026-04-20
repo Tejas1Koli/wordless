@@ -14,30 +14,30 @@ config_mgr = get_manager()
 
 
 @app.command()
-def index(repo_path: str = typer.Argument(..., help="Path to Python repository")) -> None:
-    """Index a Python repository for semantic search."""
-    try:
-        manager.index(repo_path)
-    except Exception as e:
-        typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
-
-
-@app.command()
-def search(
-    query: str = typer.Argument(..., help="Search query"),
-    hops: int = typer.Option(None, "--hops", "-h", help="Call graph expansion depth"),
-) -> None:
-    """Search the indexed codebase."""
-    result = manager.search(query, hops=hops)
-    typer.echo(result)
-
-
-@app.command()
 def repl() -> None:
     """Start interactive REPL mode."""
     repl = REPL()
     repl.run()
+
+
+@app.command("repos")
+def list_repos() -> None:
+    """List all indexed repositories saved in configuration."""
+    indexed = config_mgr.get("indexed_repos", []) or []
+    repos = [entry for entry in indexed if isinstance(entry, dict) and entry.get("path")]
+
+    if not repos:
+        typer.echo("📦 No indexed repositories saved yet.")
+        return
+
+    typer.echo("\n📚 Indexed repositories:")
+    typer.echo("─" * 60)
+    for i, entry in enumerate(repos, start=1):
+        name = entry.get("name") or "unknown"
+        path = entry.get("path")
+        typer.echo(f"{i}. {name}")
+        typer.echo(f"   {path}")
+    typer.echo("─" * 60)
 
 
 @app.command()
@@ -54,6 +54,44 @@ def serve(port: int = typer.Option(None, "--port", "-p", help="Port to run on"))
         mcp.run(transport="http", host=config.MCP_HOST, port=port)
     except Exception as e:
         typer.echo(f"❌ Error starting server: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def debug(
+    query: str = typer.Argument(..., help="Search query"),
+    repo_path: str = typer.Option(".", "--repo-path", "-r", help="Repository path to search in"),
+) -> None:
+    """Test semantic search directly without MCP. For development only."""
+    try:
+        from pathlib import Path
+        from wordless.mcp_server import _ensure_indexed, get_callgraph
+        from wordless.search import search_code
+        
+        # Resolve repo path
+        resolved_path = str(Path(repo_path).expanduser().resolve())
+        
+        # Ensure indexed
+        typer.echo(f"🔄 Ensuring repo is indexed: {resolved_path}")
+        _ensure_indexed(resolved_path)
+        
+        # Get callgraph
+        typer.echo(f"📊 Building call graph...")
+        callgraph = get_callgraph(resolved_path)
+        
+        # Search
+        typer.echo(f"🔍 Searching for: {query}\n")
+        result = search_code(query, callgraph, repo_path=resolved_path)
+        
+        if result:
+            typer.echo(result)
+        else:
+            typer.echo("No results found.")
+    
+    except Exception as e:
+        typer.echo(f"❌ Error: {e}", err=True)
+        import traceback
+        traceback.print_exc()
         raise typer.Exit(code=1)
 
 
@@ -150,6 +188,83 @@ def config(
     except ValueError as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
+
+
+@app.command()
+def doctor() -> None:
+    """Diagnostic tool to help debug Wordless setup issues."""
+    from pathlib import Path
+    import sys
+    import chromadb
+    
+    typer.echo("\n🏥 Wordless Doctor - System Diagnostics")
+    typer.echo("=" * 60)
+    
+    # 1. Python version
+    typer.echo(f"\n✓ Python: {sys.version.split()[0]}")
+    
+    # 2. Configuration file
+    from wordless import config
+    config_file = Path.home() / ".wordless" / "config.json"
+    if config_file.exists():
+        typer.echo(f"✓ Config file: {config_file} ({config_file.stat().st_size} bytes)")
+    else:
+        typer.echo(f"⚠ Config file: NOT FOUND at {config_file}")
+    
+    # 3. Vector DB
+    db_path = Path(config.DB_PATH)
+    if db_path.exists():
+        db_size = sum(f.stat().st_size for f in db_path.rglob('*') if f.is_file())
+        typer.echo(f"✓ Vector DB: {db_path} ({db_size / 1024 / 1024:.2f} MB)")
+        
+        # Check ChromaDB connectivity
+        try:
+            client = chromadb.PersistentClient(path=config.DB_PATH)
+            collections = client.list_collections()
+            typer.echo(f"✓ ChromaDB: {len(collections)} collection(s) found")
+            for col in collections:
+                count = col.count()
+                typer.echo(f"    - {col.name}: {count} vectors")
+        except Exception as e:
+            typer.echo(f"❌ ChromaDB error: {e}")
+    else:
+        typer.echo(f"⚠ Vector DB: NOT INITIALIZED at {db_path}")
+    
+    # 4. Indexed repos
+    indexed = config_mgr.get("indexed_repos", []) or []
+    repos = [e for e in indexed if isinstance(e, dict) and e.get("path")]
+    typer.echo(f"✓ Indexed repos: {len(repos)}")
+    for repo_entry in repos:
+        typer.echo(f"    - {repo_entry.get('name')}: {repo_entry.get('path')}")
+    
+    # 5. API Key
+    api_key = config.API_KEY
+    if api_key:
+        typer.echo(f"✓ API Key: Set ({len(api_key)} chars)")
+    else:
+        typer.echo(f"⚠ API Key: Not set (will use local Ollama fallback)")
+    
+    # 6. Gateway connectivity
+    try:
+        import httpx
+        response = httpx.head(config.GATEWAY_URL, timeout=2)
+        typer.echo(f"✓ Gateway: {config.GATEWAY_URL} (status: {response.status_code})")
+    except (httpx.RequestError, httpx.TimeoutException):
+        typer.echo(f"⚠ Gateway: {config.GATEWAY_URL} (unreachable, using Ollama)")
+    except Exception as e:
+        typer.echo(f"⚠ Gateway: Error checking {config.GATEWAY_URL}")
+    
+    # 7. MCP Server config
+    typer.echo(f"✓ MCP Server: {config.MCP_HOST}:{config.MCP_PORT}")
+    
+    # 8. Key paths
+    typer.echo(f"\n📁 Key paths:")
+    typer.echo(f"   Config dir: {Path.home() / '.wordless'}")
+    typer.echo(f"   Vector DB: {config.DB_PATH}")
+    typer.echo(f"   Workspace: {Path.cwd()}")
+    
+    typer.echo("\n" + "=" * 60)
+    typer.echo("✅ Doctor complete. See above for any warnings (⚠) or errors (❌).\n")
 
 
 def main() -> None:

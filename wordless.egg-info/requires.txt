@@ -1,6 +1,7 @@
 tree-sitter>=0.20
 tree-sitter-python>=0.20
 chromadb>=1.5
+httpx>=0.24
 ollama>=0.1
 prompt-toolkit>=3.0
 typer>=0.10
