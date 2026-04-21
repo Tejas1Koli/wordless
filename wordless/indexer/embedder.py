@@ -103,7 +103,48 @@ def _embed_with_openrouter(texts: list[str], api_key: str) -> list[list[float]]:
         return [item["embedding"] for item in embeddings_data]
     else:
         raise Exception(f"OpenRouter API error {response.status_code}: {response.text}")
-    for chunk in chunks:
-        response = ollama.embed(model="qwen3-embedding:0.6b", input=chunk["code"])
-        embeddings.append(response.embeddings[0])
-    return embeddings
+
+
+def get_embedding_dimensions(provider: str = None, model: str = None) -> int:
+    """Get the expected embedding dimensions for a provider/model.
+    
+    Returns:
+        Dimension count (e.g., 1536 for OpenAI text-embedding-3-small, 1024 for nvidia models)
+    """
+    if provider is None:
+        provider = getattr(config, 'EMBEDDING_PROVIDER', 'openai')
+    if model is None:
+        model = getattr(config, 'EMBEDDING_MODEL', 'text-embedding-3-small')
+    
+    # Known dimension mappings
+    dimension_map = {
+        # OpenAI models
+        "openai:text-embedding-3-small": 1536,
+        "openai:text-embedding-3-large": 3072,
+        "openai:text-embedding-3-gigantic": 3072,
+        # OpenRouter models
+        "openrouter:openai/text-embedding-3-small": 1536,
+        "openrouter:openai/text-embedding-3-large": 3072,
+        "openrouter:cohere/embed-english-v3.0": 1024,
+        "openrouter:nvidia/llama-nemotron-embed-vl-1b-v2:free": 1024,
+        "openrouter:thenlper/gte-base": 768,
+        "openrouter:thenlper/gte-small": 384,
+        "openrouter:sentence-transformers/all-MiniLM-L6-v2": 384,
+        "openrouter:sentence-transformers/all-mpnet-base-v2": 768,
+        # Ollama models
+        "ollama:qwen3-embedding:0.6b": 2560,
+    }
+    
+    key = f"{provider}:{model}"
+    if key in dimension_map:
+        return dimension_map[key]
+    
+    # Default fallback
+    if "openai" in provider.lower():
+        return 1536
+    elif "openrouter" in provider.lower():
+        return 1024  # Most OpenRouter models
+    elif "ollama" in provider.lower():
+        return 2560
+    else:
+        return 1536  # Safe default

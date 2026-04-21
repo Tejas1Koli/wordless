@@ -1,14 +1,27 @@
 from wordless.indexer.embedder import embed
-from wordless.indexer.store import search
+from wordless.indexer import store
 from wordless import config
 
 
 def search_code(query: str, callgraph: dict, hops: int = 2, repo_path: str | None = None) -> str:
+    # Check if model changed for this repo (auto-trigger re-index if needed)
+    if repo_path:
+        changed, old_key = store.model_changed(repo_path)
+        if changed:
+            # Model changed - will trigger re-indexing in main.py
+            import sys
+            print(f"\n⚠️  WARNING: Embedding model changed!", file=sys.stderr)
+            print(f"   Old: {old_key}", file=sys.stderr)
+            print(f"   New: {store._get_embedding_model_key()}", file=sys.stderr)
+            print(f"\n🔄 Re-indexing repository with new model...\n", file=sys.stderr)
+            # Clear old embeddings
+            store.clear_repo(repo_path)
+    
     # 1. embed query
     q_embedding = embed([query])[0]
     
     # 2. vector search
-    results = search(q_embedding, top_k=config.TOP_K, repo_path=repo_path)
+    results = store.search(q_embedding, top_k=config.TOP_K, repo_path=repo_path)
     
     # Build reverse graph for callers
     reverse = {}

@@ -119,9 +119,24 @@ def setup() -> None:
     
     # Step 5: Save configuration
     typer.echo("\n⏳ Saving configuration...")
+    
+    # Check if model is changing (warn user about re-indexing)
+    from wordless.indexer import store
+    old_provider = config_mgr.get("embedding_provider")
+    old_model = config_mgr.get("embedding_model")
+    
+    if (old_provider and old_model) and (old_provider != provider or old_model != selected_model):
+        typer.echo("\n⚠️  WARNING: You are changing your embedding model!")
+        typer.echo(f"   Old: {old_provider}/{old_model}")
+        typer.echo(f"   New: {provider}/{selected_model}")
+        typer.echo("\n💡 When you search, indexed repos will be automatically RE-INDEXED")
+        typer.echo("   Previous embeddings will be cleared and regenerated.")
+        typer.echo("   (This is automatic and transparent - embeddings are model-specific)\n")
+    
     try:
         config_mgr.set("embedding_provider", provider)
         config_mgr.set("api_key", api_key)
+        config_mgr.set("embedding_model", selected_model)
         typer.echo("✅ Configuration saved!")
     except Exception as e:
         typer.echo(f"❌ Failed to save configuration: {e}")
