@@ -9,8 +9,10 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Default configuration
 DEFAULTS = {
-    "api_key": "",                                      # User's auth token for our gateway
-    "gateway_url": "http://localhost:6768",            # Our hosted gateway (or local for dev)
+    "api_key": "",                                      # OpenAI or OpenRouter API key
+    "embedding_provider": "openai",                    # "openai" or "openrouter"
+    "embedding_model": "text-embedding-3-small",      # Model name for embedding
+    "gateway_url": "http://localhost:6768",            # Legacy gateway URL (deprecated)
     "top_k": 5,                                         # Search results
     "default_hops": 3,                                  # Call graph expansion
     "mcp_host": "localhost",                           # MCP server host

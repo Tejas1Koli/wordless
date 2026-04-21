@@ -75,8 +75,7 @@ def search(query: str, repo_path: str, hops: Optional[int] = None) -> str:
                - "function that handles authentication and password validation"
                - "where is the database connection initialized"
                - "find all places where user input is validated"
-               Do NOT use code syntax; use plain English.
-
+        
         repo_path: Absolute path to the repository directory.
                    Required. Must exist on the file system.
                    Example: "/Users/tejas/my-project"

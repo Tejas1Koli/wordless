@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 wordless/__init__.py
@@ -13,3 +14,11 @@ wordless.egg-info/dependency_links.txt
 wordless.egg-info/entry_points.txt
 wordless.egg-info/requires.txt
 wordless.egg-info/top_level.txt
+wordless/cli/__init__.py
+wordless/cli/app.py
+wordless/cli/commands.py
+wordless/cli/repl.py
+wordless/indexer/callgraph.py
+wordless/indexer/embedder.py
+wordless/indexer/parser.py
+wordless/indexer/store.py

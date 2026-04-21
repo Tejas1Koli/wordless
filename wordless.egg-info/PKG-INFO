@@ -2,9 +2,15 @@ Metadata-Version: 2.4
 Name: wordless
 Version: 0.1.0
 Summary: Semantic code search engine for Python codebases
-Project-URL: Homepage, https://github.com/yourusername/wordless
+Author-email: Tejas Koli <tejas.koli.2k183742@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/Tejas1Koli/wordless
+Project-URL: Repository, https://github.com/Tejas1Koli/wordless
+Project-URL: Issues, https://github.com/Tejas1Koli/wordless/issues
+Keywords: semantic-search,code-search,embeddings,ast,mcp,ai-agents
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: tree-sitter>=0.20
 Requires-Dist: tree-sitter-python>=0.20
 Requires-Dist: chromadb>=1.5
@@ -12,6 +18,421 @@ Requires-Dist: httpx>=0.24
 Requires-Dist: ollama>=0.1
 Requires-Dist: prompt-toolkit>=3.0
 Requires-Dist: typer>=0.10
-Requires-Dist: fastmcp>=0.5
+Requires-Dist: fastmcp>=3.0
+Dynamic: license-file
 
-# wordless
+# 🔍 Wordless: Semantic Code Search Engine
+
+Wordless is a semantic code search engine that leverages embeddings and call graphs to help you find code by meaning, not just by keywords. It's designed for AI agents and developers who need intelligent, context-aware code discovery.
+
+## Features
+
+- **Semantic Search**: Find code by what it does, not what it's called. Search across multiple repositories.
+- **Multi-Repository Support**: Index and search across any number of Python repositories simultaneously.
+- **MCP Server Integration**: Built-in Model Context Protocol (MCP) server for seamless AI agent integration.
+- **Auto-Indexing**: Repositories are indexed automatically on first search—no manual setup required.
+- **Call Graph Analysis**: Track function relationships and understand code dependencies.
+- **Path Context Enrichment**: Code is embedded with full directory hierarchy for better semantic disambiguation.
+- **Persistent Registry**: Automatically tracks indexed repositories and saves them to configuration.
+- **Development-Friendly**: CLI debug commands for testing and exploration.
+
+## Installation
+
+### Prerequisites
+- Python 3.10+
+- **OpenAI API key** (Recommended) or Ollama for local embeddings
+
+### Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/Tejas1Koli/wordless.git
+cd wordless
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv wrd
+source wrd/bin/activate  # On Windows: wrd\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+# For development (editable install)
+pip install -e .
+
+# Or from PyPI (when published)
+# pip install wordless
+```
+
+4. Configure your embedding provider (choose one):
+
+   **Option A: Interactive Setup (Recommended)**
+   ```bash
+   wordless setup
+   ```
+   This walks you through:
+   - Choosing a provider (OpenAI, OpenRouter, or Ollama)
+   - Entering your API key (validated automatically)
+   - Selecting your preferred model
+   - Saving everything in one command
+
+   **Option B: Manual OpenAI Setup**
+   ```bash
+   # Get API key: https://platform.openai.com/account/api-keys
+   wordless config set api_key sk-proj-YOUR_OPENAI_API_KEY
+   ```
+
+   **Option C: Manual OpenRouter Setup**
+   ```bash
+   # Get API key: https://openrouter.ai/keys
+   wordless config set api_key YOUR_OPENROUTER_KEY
+   wordless config set embedding_provider openrouter
+   ```
+
+   **Option D: Local Ollama Setup (Free)**
+   ```bash
+   # Install Ollama from https://ollama.ai
+   ollama pull qwen3-embedding:0.6b
+   # (No config needed - automatically used as fallback)
+   ```
+
+## Quick Start
+
+### 1. Initial Setup (First Time)
+
+```bash
+wordless setup
+```
+
+This wizard will guide you through:
+- Choosing your embedding provider (OpenAI, OpenRouter, or Ollama)
+- Entering and validating your API key
+- Selecting your preferred model
+- All settings are saved automatically
+
+### 2. Start the MCP Server (for AI agents)
+
+```bash
+wordless serve
+```
+
+This starts an HTTP server on `localhost:6767` that exposes two tools:
+- `search(query, repo_path, hops)` — semantic search with optional call graph traversal
+- `list_indexed_repos()` — discover indexed repositories
+
+### 2. CLI Usage
+
+**Initial Setup (Interactive):**
+```bash
+wordless setup
+```
+
+**Interactive REPL:**
+```bash
+wordless repl
+```
+
+**List indexed repositories:**
+```bash
+wordless repos
+```
+
+**Development/debug search:**
+```bash
+wordless debug "find async handlers" --repo-path /path/to/repo
+wordless debug "parse python source code"  # Uses current directory
+```
+
+**Manage configuration (Advanced):**
+```bash
+wordless config set top_k 10
+wordless config get api_key
+wordless config list
+wordless config reset top_k
+wordless config reset-all
+```
+
+**System diagnostics:**
+```bash
+wordless doctor
+```
+
+## Usage Examples
+
+### As an AI Agent (via MCP)
+
+```python
+import requests
+import json
+
+# Start wordless server first:
+# wordless serve
+
+# Call the search tool via MCP
+url = "http://localhost:6767/mcp"
+query = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+        "name": "search",
+        "arguments": {
+            "query": "parse python code and extract definitions",
+            "repo_path": "/path/to/repo",
+            "hops": 1
+        }
+    }
+}
+
+response = requests.post(url, json=query)
+results = response.json()
+```
+
+### From Python Code
+
+```python
+from wordless.mcp_server import search, list_indexed_repos
+
+# List indexed repos
+repos = list_indexed_repos()
+print(f"Indexed repos: {repos}")
+
+# Search with auto-indexing
+results = search(
+    query="semantic search implementation",
+    repo_path="/path/to/repo",
+    hops=1
+)
+print(results)
+```
+
+### From CLI Development
+
+```bash
+# Search in current directory (auto-indexes if not already indexed)
+wordless debug "find all factory patterns" --repo-path .
+
+# Search in specific repo
+wordless debug "async request handlers" --repo-path ~/myproject
+```
+
+## Architecture
+
+### Components
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MCP Server (FastMCP)                     │
+│  HTTP endpoint: localhost:6767                              │
+│  - search(query, repo_path, hops)                           │
+│  - list_indexed_repos()                                     │
+└─────────────────────────────────────────────────────────────┘
+             ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  Search Pipeline                            │
+├─────────────────────────────────────────────────────────────┤
+│ 1. Parser (tree-sitter)                                     │
+│    Extract functions/classes with path context              │
+│                                                              │
+│ 2. Embedder                                                 │
+│    - Cloud gateway (if API key available)                   │
+│    - Local Ollama fallback (qwen3-embedding:0.6b)           │
+│                                                              │
+│ 3. Vector Store (ChromaDB)                                  │
+│    Persist embeddings with metadata                         │
+│                                                              │
+│ 4. Call Graph                                               │
+│    AST-based function call relationships                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Storage Locations
+
+- **Vector Database**: `~/.wordless/code_memory/` (ChromaDB persistent client)
+- **Configuration**: `~/.wordless/config.json`
+  - `indexed_repos`: List of `{name, path}` dicts
+  - `api_key`: Cloud embedding API key
+  - `gateway_url`: Custom gateway endpoint
+  - `top_k`: Number of results to return
+  - `default_hops`: Call graph traversal depth
+
+### Key Design Decisions
+
+1. **Required `repo_path` in MCP search**: Agents must explicitly specify which repo to search. This prevents ambiguity and makes the tool stateless.
+
+2. **Auto-Indexing**: First search on a repo automatically indexes it via `_ensure_indexed()`. No manual CLI step needed.
+
+3. **Path Context Enrichment**: Code is embedded with directory hierarchy prepended: `[wordless/indexer/parser.py]\ndef extract_chunks...`. This improves semantic search quality and function name disambiguation.
+
+4. **Qualified Call Graph Keys**: Functions are keyed as `filepath::function_name` to avoid collisions in multi-file systems.
+
+5. **Single Source of Truth**: All search logic lives in the MCP server. CLI commands are thin wrappers for utility operations.
+
+## Configuration
+
+Default configuration file: `~/.wordless/config.json`
+
+```json
+{
+  "api_key": null,
+  "gateway_url": "https://api.example.com",
+  "top_k": 5,
+  "default_hops": 1,
+  "mcp_host": "localhost",
+  "mcp_port": 6767,
+  "indexed_repos": [
+    {"name": "wordless", "path": "/Users/you/wordless"},
+    {"name": "myproject", "path": "/Users/you/myproject"}
+  ]
+}
+```
+
+Run `wordless config list` to see current settings.
+
+## Embedding Strategy
+
+### OpenAI (Recommended)
+
+Use OpenAI's superior embedding models. Set your API key:
+
+```bash
+wordless config set api_key sk-proj-YOUR_OPENAI_API_KEY
+wordless config set embedding_provider openai
+```
+
+Wordless uses `text-embedding-3-small` by default (small, fast, 1536 dimensions).
+
+**Supported models:**
+- `text-embedding-3-small` (default) — 1536 dims, faster, cheaper
+- `text-embedding-3-large` — 3072 dims, more accurate
+
+Get your API key from: https://platform.openai.com/account/api-keys
+
+### OpenRouter (Alternative)
+
+Use OpenRouter for access to multiple LLM providers and embeddings. Set your credentials:
+
+```bash
+wordless config set api_key YOUR_OPENROUTER_API_KEY
+wordless config set embedding_provider openrouter
+```
+
+Get your API key from: https://openrouter.ai/keys
+
+**Supported models via OpenRouter:**
+- `openai/text-embedding-3-small` (default)
+- `openai/text-embedding-3-large`
+- Other embedding models available through OpenRouter
+
+**Why use OpenRouter?**
+- No direct API access needed (useful in restricted environments)
+- Access to multiple providers from one dashboard
+- Usage analytics and cost tracking
+
+### Local Ollama (Fallback)
+
+Automatically used if:
+- No API key is configured
+- Configured provider is unreachable
+
+Install Ollama:
+```bash
+# macOS/Linux/Windows from https://ollama.ai
+ollama pull qwen3-embedding:0.6b
+```
+
+## Switching Providers
+
+```bash
+# Check current settings
+wordless config get embedding_provider
+wordless config get api_key
+
+# Switch to OpenAI
+wordless config set embedding_provider openai
+wordless config set api_key sk-proj-YOUR_KEY
+
+# Switch to OpenRouter
+wordless config set embedding_provider openrouter
+wordless config set api_key YOUR_ROUTER_KEY
+
+# Use local Ollama (no config needed)
+# Just don't set an api_key
+wordless config reset api_key
+```
+
+## Development
+
+### Running Tests
+
+```bash
+python -m pytest
+```
+
+### Debug Command
+
+The `wordless debug` command is useful for development:
+
+```bash
+# Test search without HTTP overhead
+wordless debug "your query" --repo-path .
+
+# Watch indexing and call graph building
+wordless debug "parse" -r ./target_repo
+```
+
+### Project Structure
+
+```
+wordless/
+├── cli/
+│   ├── app.py           # CLI entry point & commands
+│   ├── repl.py          # Interactive REPL
+│   └── commands.py      # IndexManager class
+├── indexer/
+│   ├── parser.py        # Tree-sitter extraction
+│   ├── embedder.py      # Embedding logic (cloud + local)
+│   ├── store.py         # ChromaDB interface
+│   └── callgraph.py     # Call graph builder
+├── mcp_server.py        # MCP server & core search logic
+├── search.py            # Semantic search function
+├── config_manager.py    # Configuration management
+├── config.py            # Config defaults & constants
+└── main.py              # Entry point
+```
+
+## Troubleshooting
+
+**"No indexed repositories found"**
+- Run `wordless debug "test query"` to auto-index the current repo
+- Check `wordless repos` to list indexed repos
+
+**"Gateway unreachable" warning**
+- Make sure `wordless config set api_key YOUR_KEY` is set
+- Or install Ollama locally for fallback embeddings
+
+**"No Python files found to index"**
+- Make sure the directory contains `.py` files
+- Some directories are automatically skipped: `__pycache__`, `.venv`, `venv`, `node_modules`, `.git`, `dist`, `build`
+
+**Vector database errors**
+- Run `wordless doctor` for diagnostics
+- Check `~/.wordless/code_memory/` permissions
+- Consider clearing via: `rm -rf ~/.wordless/code_memory`
+
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Submit a pull request
+
+## License
+
+MIT
+
+## Support
+
+For issues, questions, or feature requests, please open an issue on GitHub.

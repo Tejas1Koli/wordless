@@ -6,9 +6,11 @@ from wordless.config_manager import get
 # History file for REPL
 HISTORY_FILE = Path.home() / ".wordless_history"
 
-# Cloud gateway configuration
+# Embedding provider configuration
 API_KEY = get("api_key")
-GATEWAY_URL = get("gateway_url", "http://localhost:6768")
+EMBEDDING_PROVIDER = get("embedding_provider", "openai")  # "openai" or "openrouter"
+EMBEDDING_MODEL = get("embedding_model", "text-embedding-3-small")
+GATEWAY_URL = get("gateway_url", "http://localhost:6768")  # Legacy
 
 # Repository
 REPO_PATH = get("repo_path")

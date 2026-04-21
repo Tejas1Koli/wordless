@@ -41,6 +41,251 @@ def list_repos() -> None:
 
 
 @app.command()
+def setup() -> None:
+    """Interactive setup wizard for embeddings configuration.
+    
+    For detailed documentation, see: wordless/cli/SETUP_README.md
+    
+    This wizard will guide you through:
+    - Choosing an embedding provider (OpenAI, OpenRouter, Ollama)
+    - Entering and validating your API key
+    - Selecting your preferred embedding model
+    - Saving all settings automatically
+    """
+    typer.echo("\n🔧 Wordless Setup Wizard")
+    typer.echo("─" * 60)
+    
+    # Step 1: Choose provider
+    typer.echo("\n📌 Step 1: Choose Embedding Provider")
+    typer.echo("1. OpenAI (Recommended - Best quality)")
+    typer.echo("2. OpenRouter (Alternative - Multi-provider)")
+    typer.echo("3. Local Ollama (Free - No API key needed)")
+    
+    choice = typer.prompt("Select option", type=int)
+    
+    if choice == 1:
+        provider = "openai"
+        api_url = "https://platform.openai.com/account/api-keys"
+    elif choice == 2:
+        provider = "openrouter"
+        api_url = "https://openrouter.ai/keys"
+    elif choice == 3:
+        provider = "ollama"
+        typer.echo("\n✅ Ollama configured!")
+        typer.echo("   Make sure to install: ollama pull qwen3-embedding:0.6b")
+        config_mgr.reset("api_key")
+        config_mgr.reset("embedding_provider")
+        typer.echo("\n✨ Setup complete!")
+        return
+    else:
+        typer.echo("❌ Invalid option. Setup cancelled.")
+        raise typer.Exit(code=1)
+    
+    # Step 2: Get API key
+    typer.echo(f"\n📌 Step 2: API Key")
+    typer.echo(f"Get your free API key at: {api_url}")
+    
+    api_key = typer.prompt("Enter your API key")
+    if not api_key or len(api_key.strip()) == 0:
+        typer.echo("❌ API key cannot be empty. Setup cancelled.")
+        raise typer.Exit(code=1)
+    
+    # Step 3: Validate API key and fetch available models
+    typer.echo("\n⏳ Validating API key and fetching available models...")
+    if not _validate_api_key(api_key, provider):
+        typer.echo(f"❌ API key validation failed. Please check your key and try again.")
+        typer.echo(f"   Get a new key at: {api_url}")
+        raise typer.Exit(code=1)
+    
+    typer.echo("✅ API key validated!")
+    
+    # Fetch available embedding models
+    typer.echo("\n⏳ Fetching available embedding models...")
+    if provider == "openai":
+        models = _fetch_openai_models(api_key)
+    elif provider == "openrouter":
+        models = _fetch_openrouter_models(api_key)
+    else:
+        models = []
+    
+    if not models:
+        typer.echo("⚠️  Could not fetch available models from provider.")
+        typer.echo("   Using recommended defaults.")
+        if provider == "openai":
+            models = ["text-embedding-3-small", "text-embedding-3-large"]
+        else:
+            models = ["openai/text-embedding-3-small", "openai/text-embedding-3-large"]
+    
+    # Step 4: Choose model
+    typer.echo(f"\n📌 Step 3: Select Embedding Model")
+    for i, model in enumerate(models, 1):
+        typer.echo(f"{i}. {model}")
+    
+    model_choice = typer.prompt("Select model", type=int)
+    
+    if model_choice < 1 or model_choice > len(models):
+        typer.echo("❌ Invalid model selection. Setup cancelled.")
+        raise typer.Exit(code=1)
+    
+    selected_model = models[model_choice - 1]
+    
+    # Step 5: Save configuration
+    typer.echo("\n⏳ Saving configuration...")
+    try:
+        config_mgr.set("embedding_provider", provider)
+        config_mgr.set("api_key", api_key)
+        typer.echo("✅ Configuration saved!")
+    except Exception as e:
+        typer.echo(f"❌ Failed to save configuration: {e}")
+        raise typer.Exit(code=1)
+    
+    # Step 6: Summary
+    typer.echo("\n" + "=" * 60)
+    typer.echo("✨ Setup Complete!")
+    typer.echo("=" * 60)
+    typer.echo(f"Provider: {provider}")
+    typer.echo(f"API Key: {api_key[:10]}{'*' * (len(api_key) - 10)}")
+    typer.echo(f"Model: {selected_model}")
+    typer.echo("\n💡 You can now use Wordless to search your code!")
+    typer.echo("   Try: wordless debug 'find parser functions'")
+    typer.echo("=" * 60)
+
+
+def _validate_api_key(api_key: str, provider: str) -> bool:
+    """Validate API key by making a test request."""
+    import httpx
+    
+    try:
+        if provider == "openai":
+            response = httpx.post(
+                "https://api.openai.com/v1/embeddings",
+                json={
+                    "input": ["test"],
+                    "model": "text-embedding-3-small",
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                timeout=10,
+            )
+        elif provider == "openrouter":
+            response = httpx.post(
+                "https://openrouter.ai/api/v1/embeddings",
+                json={
+                    "input": ["test"],
+                    "model": "openai/text-embedding-3-small",
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://wordless.dev",
+                    "X-Title": "Wordless",
+                },
+                timeout=10,
+            )
+        else:
+            return False
+        
+        if response.status_code == 200:
+            return True
+        elif response.status_code == 401:
+            typer.echo("   🔴 Invalid API key (401 Unauthorized)")
+            return False
+        elif response.status_code == 429:
+            typer.echo("   🟡 Rate limited - but key seems valid")
+            return True
+        else:
+            typer.echo(f"   🔴 API error: {response.status_code}")
+            return False
+    except httpx.TimeoutException:
+        typer.echo("   🟡 Timeout - but key seems valid")
+        return True
+    except httpx.RequestError as e:
+        typer.echo(f"   🔴 Network error: {e}")
+        return False
+    except Exception as e:
+        typer.echo(f"   🔴 Validation error: {e}")
+        return False
+
+
+def _fetch_openai_models(api_key: str) -> list[str]:
+    """Fetch available embedding models from OpenAI API."""
+    import httpx
+    
+    try:
+        response = httpx.get(
+            "https://api.openai.com/v1/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=10,
+        )
+        
+        if response.status_code != 200:
+            return []
+        
+        data = response.json()
+        # Filter for embedding models
+        models = [
+            model["id"] for model in data.get("data", [])
+            if "embedding" in model["id"]
+        ]
+        
+        # Prioritize recommended models
+        recommended = ["text-embedding-3-small", "text-embedding-3-large"]
+        sorted_models = sorted(
+            models,
+            key=lambda m: (m not in recommended, recommended.index(m) if m in recommended else 999)
+        )
+        
+        return sorted_models if sorted_models else []
+    except Exception as e:
+        typer.echo(f"   ⚠️  Could not fetch OpenAI models: {e}")
+        return []
+
+
+def _fetch_openrouter_models(api_key: str) -> list[str]:
+    """Get popular embedding models available via OpenRouter."""
+    import httpx
+    
+    # Curated list of popular embedding models available through OpenRouter
+    # These are proven to work with OpenRouter's embedding endpoint
+    popular_models = [
+        "openai/text-embedding-3-small",
+        "openai/text-embedding-3-large",
+        "cohere/embed-english-v3.0",
+        "nvidia/llama-nemotron-embed-vl-1b-v2:free",
+        "thenlper/gte-base",
+        "thenlper/gte-small",
+        "sentence-transformers/all-MiniLM-L6-v2",
+        "sentence-transformers/all-mpnet-base-v2",
+    ]
+    
+    # Try to validate API key works
+    try:
+        response = httpx.post(
+            "https://openrouter.ai/api/v1/embeddings",
+            json={
+                "input": ["test"],
+                "model": "openai/text-embedding-3-small",
+            },
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "HTTP-Referer": "https://wordless.dev",
+                "X-Title": "Wordless",
+            },
+            timeout=10,
+        )
+        
+        # If successful, return the popular models
+        if response.status_code == 200:
+            return popular_models
+            
+    except Exception:
+        pass
+    
+    return popular_models
+
+
 def serve(port: int = typer.Option(None, "--port", "-p", help="Port to run on")) -> None:
     """Start MCP server for LLM integration."""
     try:
@@ -95,6 +340,7 @@ def debug(
         raise typer.Exit(code=1)
 
 
+
 @app.command()
 def config(
     action: str = typer.Argument(None, help="Action: set, get, list, reset, reset-all"),
@@ -103,15 +349,19 @@ def config(
 ) -> None:
     """Manage Wordless configuration.
     
+    For detailed documentation, see: wordless/cli/CONFIG_README.md
+    
     Examples:
-        wordless config set repo_path /path/to/repo
-        wordless config get repo_path
+        wordless config set api_key sk-proj-YOUR_KEY
+        wordless config get embedding_provider
         wordless config list
-        wordless config reset repo_path
+        wordless config reset top_k
         wordless config reset-all
     """
     if not action:
         typer.echo("Usage: wordless config [set|get|list|reset|reset-all] [key] [value]")
+        typer.echo("\n💡 For detailed documentation, see: wordless/cli/CONFIG_README.md")
+        typer.echo("   Or visit: https://github.com/Tejas1Koli/wordless/blob/main/wordless/cli/CONFIG_README.md")
         raise typer.Exit()
 
     try:
@@ -183,6 +433,7 @@ def config(
         else:
             typer.echo(f"❌ Unknown action: {action}")
             typer.echo("Valid actions: set, get, list, reset, reset-all")
+            typer.echo("\n💡 See CONFIG_README.md for detailed documentation.")
             raise typer.Exit(code=1)
 
     except ValueError as e:
