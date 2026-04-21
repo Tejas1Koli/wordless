@@ -99,35 +99,23 @@ def setup() -> None:
     
     typer.echo("✅ API key validated!")
     
-    # Fetch available embedding models
-    typer.echo("\n⏳ Fetching available embedding models...")
+    # Step 3: Get embedding model
+    typer.echo(f"\n📌 Step 3: Embedding Model")
     if provider == "openai":
-        models = _fetch_openai_models(api_key)
+        typer.echo("   Examples: text-embedding-3-small, text-embedding-3-large")
     elif provider == "openrouter":
-        models = _fetch_openrouter_models(api_key)
-    else:
-        models = []
+        typer.echo("   Examples:")
+        typer.echo("   - openai/text-embedding-3-small")
+        typer.echo("   - nvidia/llama-nemotron-embed-vl-1b-v2:free")
+        typer.echo("   - thenlper/gte-base")
+        typer.echo("   Visit: https://openrouter.ai/models?only=embedding for full list")
     
-    if not models:
-        typer.echo("⚠️  Could not fetch available models from provider.")
-        typer.echo("   Using recommended defaults.")
-        if provider == "openai":
-            models = ["text-embedding-3-small", "text-embedding-3-large"]
-        else:
-            models = ["openai/text-embedding-3-small", "openai/text-embedding-3-large"]
+    model_prompt = "Enter embedding model name" if provider == "openai" else "Enter embedding model (from OpenRouter)"
+    selected_model = typer.prompt(model_prompt)
     
-    # Step 4: Choose model
-    typer.echo(f"\n📌 Step 3: Select Embedding Model")
-    for i, model in enumerate(models, 1):
-        typer.echo(f"{i}. {model}")
-    
-    model_choice = typer.prompt("Select model", type=int)
-    
-    if model_choice < 1 or model_choice > len(models):
-        typer.echo("❌ Invalid model selection. Setup cancelled.")
+    if not selected_model or len(selected_model.strip()) == 0:
+        typer.echo("❌ Model name cannot be empty. Setup cancelled.")
         raise typer.Exit(code=1)
-    
-    selected_model = models[model_choice - 1]
     
     # Step 5: Save configuration
     typer.echo("\n⏳ Saving configuration...")
